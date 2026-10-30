@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mirror">
+<meta name="theme-color" content="#000000">
+<title>All Hallows' Mirror</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  html, body {
+    margin: 0; height: 100%; background: #000; overflow: hidden;
+    touch-action: none; -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+  }
+  canvas#stage { position: fixed; inset: 0; display: block; }
+  video#cam { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+  #start {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 28px; padding: 24px;
+    background: radial-gradient(ellipse at 50% 30%, #1c2547 0%, #0a0d1c 70%);
+    color: #f3d98a; font-family: Cinzel, Georgia, serif; text-align: center;
+    transition: opacity .6s ease;
+  }
+  #start.gone { opacity: 0; pointer-events: none; }
+  #start h1 { margin: 0; font-size: clamp(32px, 7vw, 64px); font-weight: 700; letter-spacing: .04em;
+    text-shadow: 0 0 24px rgba(255, 210, 110, .55); }
+  #start .sub { font-size: clamp(14px, 2.6vw, 20px); color: #cdbb85; max-width: 32ch; line-height: 1.5; }
+  #startBtn {
+    font: 700 clamp(18px, 3.4vw, 26px) Cinzel, Georgia, serif; color: #1b1405;
+    background: linear-gradient(#ffe9a3, #d9a93c); border: 0; border-radius: 999px;
+    padding: 18px 40px; box-shadow: 0 0 30px rgba(255, 200, 90, .45);
+  }
+  #msg { min-height: 1.5em; color: #ffb4a8; font-family: Georgia, serif; font-size: 16px; max-width: 36ch; line-height: 1.5; }
+
+  #panel {
+    position: fixed; top: 16px; left: 16px; z-index: 10; width: min(340px, calc(100vw - 32px));
+    background: rgba(10, 12, 24, .92); color: #eee; border: 1px solid rgba(243, 217, 138, .4);
+    border-radius: 14px; padding: 16px; font: 15px/1.5 -apple-system, system-ui, sans-serif;
+  }
+  #panel[hidden] { display: none; }
+  #panel .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  #panel button {
+    font: inherit; color: #1b1405; background: #f3d98a; border: 0; border-radius: 8px;
+    padding: 8px 12px; margin: 4px 6px 4px 0;
+  }
+  #panel #pinfo { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: #c9c9c9; margin-bottom: 8px; white-space: pre-line; }
+  #panel .hint { font-size: 13px; color: #a8a8a8; margin-top: 8px; }
+  #plist { display: flex; flex-wrap: wrap; max-height: 40vh; overflow-y: auto; margin-top: 8px; touch-action: pan-y; }
+  #plist button { background: rgba(243, 217, 138, .18); color: #f3d98a; padding: 6px 10px; font-size: 14px; }
+  #plist button.on { background: #f3d98a; color: #1b1405; }
+
+  #snap {
+    position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); z-index: 5; transform: translateX(-50%);
+    width: 76px; height: 76px; border-radius: 50%; border: 4px solid rgba(255, 255, 255, .9);
+    background: rgba(0, 0, 0, .35); color: #fff; display: grid; place-items: center; padding: 0;
+    box-shadow: 0 0 18px rgba(0, 0, 0, .5);
+  }
+  #snap[hidden] { display: none; }
+  #snap svg { width: 36px; height: 36px; }
+  #photo {
+    position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+    background: rgba(5, 6, 14, .82); padding: 16px;
+  }
+  #photo[hidden] { display: none; }
+  #photo .card { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+  #photoImg { max-width: min(88vw, 900px); max-height: 72vh; border: 10px solid #fbf6ea; border-radius: 4px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .6); transform: rotate(-1.5deg); }
+  #photo .actions { display: flex; gap: 14px; }
+  #photo button {
+    font: 700 clamp(17px, 3vw, 22px) Cinzel, Georgia, serif; border: 0; border-radius: 999px; padding: 14px 30px;
+  }
+  #photoSave { color: #1b1405; background: linear-gradient(#ffe9a3, #d9a93c); box-shadow: 0 0 24px rgba(255, 200, 90, .45); }
+  #photoClose { color: #f3d98a; background: rgba(243, 217, 138, .15); }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<video id="cam" playsinline muted autoplay></video>
+
+<div id="start">
+  <h1>All Hallows' Mirror</h1>
+  <div class="sub">See your saintly side</div>
+  <button id="startBtn">Tap to begin</button>
+  <div id="msg"></div>
+</div>
+
+<div id="panel" hidden>
+  <div class="row"><b>Settings</b><button id="pclose">Close</button></div>
+  <div id="pinfo"></div>
+  <div><button id="pauto"></button><button id="pint"></button></div>
+  <div id="plist"></div>
+  <div class="hint">Tap right half: next filter · Tap left half: previous · Camera button: photo · Triple-tap top-left corner: this panel · Keyboard: ← → A S</div>
+</div>
+
+<button id="snap" hidden aria-label="Take a photo">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>
+</button>
+
+<div id="photo" hidden>
+  <div class="card">
+    <img id="photoImg" alt="Your photo from the mirror">
+    <div class="actions"><button id="photoSave">Save photo</button><button id="photoClose">Close</button></div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
